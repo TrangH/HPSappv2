@@ -1,19 +1,18 @@
 #check if all required packages are installed
-mypackages <- c("leaflet", "sp", "shiny", "ggplot2", "geojsonio", 
-                "RColorBrewer", "dplyr")
+mypackages <- c("shiny","leaflet","plotly", 
+                "RColorBrewer","ggplot2",
+                "dplyr","tidyr",
+                "geojsonio", "sp", 
+                "zoo","scales")
 checkpkg <- mypackages[!(mypackages %in% installed.packages()[,"Package"])];
 #if not, then install the missing packages  
 if(length(checkpkg)) install.packages(checkpkg, dependencies = TRUE)
 #loading packages
-library(shiny); 
-library(plotly); library(scales)
-library(leaflet); 
-library(RColorBrewer); 
-library(ggplot2); 
+library(shiny); library(leaflet); library(plotly); 
+library(RColorBrewer); library(ggplot2); 
 library(dplyr); library(tidyr)
-library(geojsonio); 
-library(sp);
-library(zoo)
+library(geojsonio); library(sp);
+library(zoo); library(scales)
 
 ####Objects created outside of server----
 ##semesters
