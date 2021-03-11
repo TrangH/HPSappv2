@@ -1,3 +1,82 @@
+
+#check if all required packages are installed
+mypackages <- c("leaflet", "sp", "shiny", "ggplot2", "geojsonio", 
+                "RColorBrewer", "dplyr")
+checkpkg <- mypackages[!(mypackages %in% installed.packages()[,"Package"])];
+#if not, then install the missing packages  
+if(length(checkpkg)) install.packages(checkpkg, dependencies = TRUE)
+#loading packages
+library(shiny); 
+library(plotly); library(scales)
+library(leaflet); 
+library(RColorBrewer); 
+library(ggplot2); 
+library(dplyr); library(tidyr)
+library(geojsonio); 
+library(sp);
+library(zoo)
+
+####Objects created outside of server----
+##semesters
+#05/12 - 06/11 Spring; 06/11 - 08/30 Summer
+#09/01 - 12/30 Fall; 01/01 - 02/01 Winter
+dates_sem <- data.frame(
+  from1 = as.Date(c('2020-05-12','2020-09-01')), #beginnings of spring and fall
+  to1  = as.Date(c('2020-06-11','2020-12-30')),
+  col = as.factor(c('blue','green')))
+dates_sem2 <- data.frame(
+  from1 = as.Date(c('2020-09-16')), #beginnings of fall (for contact day data)
+  to1  = as.Date(c('2020-12-30')),
+  col = as.factor(c('green')))
+
+##transfrom .json file into a spatial polygons data frame
+states <- 
+  geojson_read( 
+    x = "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json", 
+    what = "sp"
+  )
+##Survey periods: To make survey frequency consistent
+  survey_periods <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", 
+                                     "1iXvi-q3OUVPu5CRAVpvQ9JVuBG0XQczf"),
+                             header=TRUE,check.names=FALSE,stringsAsFactors=FALSE);
+  n_rounds <- nrow(survey_periods)
+  #
+  survey_periods$Begin <- as.Date(survey_periods$Begin, format = '%d/%m/%Y')
+  survey_periods$End <- as.Date(survey_periods$End, format = '%d/%m/%Y')
+  #add biweekly indicators and dates for first 12 weeks
+  survey_periods$Biweek <- recode(survey_periods$Round, 
+                                  `1`='1',`2`='1',`3`='2',`4`='2',`5`='3',`6`='3',
+                                  `7`='4',`8`='4',`9`='5',`10`='5',`11`='6',`12`='6',
+                                  `13`='7',`14`='8',`15`='9',`16`='10',`17`='11',`18`='12',
+                                  `19`='13',`20`='14',`21`='15',`22`='16',`23`='17')
+  survey_periods$Biweek_begin = survey_periods$Biweek_end = 
+    as.Date(rep(0, n_rounds))
+  survey_periods$Biweek_begin[seq(1,12,2)] = 
+    survey_periods$Biweek_begin[seq(2,12,2)] = 
+    survey_periods$Begin[seq(1,12,2)]
+  survey_periods$Biweek_end[seq(1,12,2)] = 
+    survey_periods$Biweek_end[seq(2,12,2)] = 
+    survey_periods$End[seq(2,12,2)]
+  #keep other weeks unchanged
+  survey_periods$Biweek_begin[c(13:23)] = survey_periods$Begin[c(13:23)]
+  survey_periods$Biweek_end[c(13:23)] = survey_periods$End[c(13:23)]
+  #
+#function to collapse the first 12 weeks
+collapse_12week <- function(df){
+  df <- df %>%
+    mutate(Week = survey_periods$Biweek[match(Week, survey_periods$Round)],
+           Week_end = survey_periods$Biweek_end[match(Week_end, survey_periods$End)]) 
+  df_upper <- df %>% filter(Week %in% c(1:6)) %>%  
+    group_by_at(.vars = c(1:5))  %>%
+    summarise(across(where(is.numeric), 
+                     ~ mean(.x, na.rm = TRUE))) %>%
+    ungroup()
+  df_upper[sapply(df_upper, is.nan)] <- NA
+  df_lower <- df %>% filter(!Week %in% c(1:6)) 
+  df <- bind_rows(df_upper, df_lower)
+  return(df) 
+}
+
 ui <- fluidPage(
   # App title ----
   titlePanel(
